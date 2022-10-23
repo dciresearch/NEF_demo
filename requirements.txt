@@ -1,0 +1,6 @@
+numpy==1.23.4
+pandas==1.5.1
+spacy==3.4.2
+st_annotated_text==3.0.0
+stanza==1.4.2
+streamlit==1.13.0
