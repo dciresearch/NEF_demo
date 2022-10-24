@@ -1,4 +1,4 @@
-from itertools import chain
+from itertools import chain, zip_longest
 from functools import lru_cache
 import re
 import spacy
@@ -54,11 +54,15 @@ def subtree_to_text(subtree):
 def get_object(el, max_depth=6):
     if max_depth == 0 or not el or el.pos_ == 'VERB':
         return [""]
-    if el.pos_ == "NOUN":
+    if el.pos_ in {"NOUN", "PROPN", "X"}:
         subtree = get_subtree(el)
         return [subtree_to_text(subtree)]
     else:
         return [" ".join([el.text, st]) for ch in el.children for st in get_object(ch, max_depth-1) if st]
+
+
+def get_full_ent_text(ent):
+    return subtree_to_text(get_subtree(ent.root))
 
 
 def get_subj_triples(ent):
@@ -73,17 +77,19 @@ def get_subj_triples(ent):
             if not obj:
                 continue
             triples.append(
-                (ent.text, "{}".format(get_compounds(relation)), obj))
+                (get_full_ent_text(ent), "{}".format(get_compounds(relation)), obj))
     return triples
 
 
 def get_appos_triples(ent):
     triples = []
     relation = ent.root.head
+    mods = [relation]
     for ch in relation.children:
-        if ch.dep_ == "nmod":
-            triples.append((ent.text, "является", " ".join(
-                (relation.text, subtree_to_text(ch.subtree)))))
+        if ch.dep_ in {"amod", "nmod"}:
+            mods.extend(ch.subtree)
+    triples.append((get_full_ent_text(ent), "является", subtree_to_text(
+        sorted(mods, key=lambda x: x.i))))
     return triples
 
 
@@ -137,7 +143,9 @@ class SpacyExtractor:
         # get gap token spans
         gaps = ((a[1], b[0]) for a, b in zip(ent_slices, ent_slices[1:]))
         # fill gaps
-        full_slices = list(chain(*zip(ent_slices, gaps)))
+        #full_slices = list(chain(*zip(ent_slices, gaps)))
+        full_slices = list(filter(lambda x: x is not None, chain.from_iterable(
+            zip_longest(ent_slices, gaps, fillvalue=None))))
         if full_slices[0][0] != 0:
             full_slices = [(0, full_slices[0][0])]+full_slices
         if full_slices[-1][1] != len(tokens):
