@@ -7,7 +7,12 @@
 
 Модели нужно распаковать в папку ./models
 
-Команда для запуска:
+Команда для запуска FastAPI + Streamlit:
+```
+./fastapi_server.sh
+```
+
+Команда для запуска чистой реализации:
 ```
 streamlit run st_interface.py
 ```

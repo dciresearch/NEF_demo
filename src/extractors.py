@@ -15,11 +15,13 @@ spacy_models = {
 
 valid_processors = {
     "ru": ["Spacy"],
-    "en": ["Spacy", "Stanza (OpenIE)"],
+    "en": ["Spacy", "Stanza"],
 }
 
 
 def get_processor_list(lang):
+    if lang not in valid_processors:
+        raise "Language {} not supported".format(lang)
     return valid_processors[lang]
 
 
@@ -139,6 +141,7 @@ class SpacyExtractor:
         doc = self.process_document(text)
         tokens = [tok.text_with_ws for tok in doc]
         # get ent spans
+        ents = [e.text for e in doc.ents]
         ent_slices = [(ent.start, ent.end, ent.label_) for ent in doc.ents]
         # get gap token spans
         gaps = ((a[1], b[0]) for a, b in zip(ent_slices, ent_slices[1:]))
@@ -156,7 +159,7 @@ class SpacyExtractor:
                           ("".join(tokens[slice(*sl[:2])]), sl[2])] for sl in full_slices)
         display_tokens = [tok for span in span_generator for tok in span]
 
-        return display_tokens
+        return display_tokens, ents
 
 
 class OpenIEExtractor:
@@ -187,14 +190,15 @@ class OpenIEExtractor:
 
     def get_tokens_for_display(self, text):
         doc = self.process_document(text)
-        tokens = [(tok.word + tok.after, tok.ner) if tok.ner != 'O'
-                  else tok.word + tok.after for sent in doc.sentence for tok in sent.token]
-        return tokens
+        ents = self.get_entities(text)
+        display_tokens = [(tok.word + tok.after, tok.ner) if tok.ner != 'O'
+                          else tok.word + tok.after for sent in doc.sentence for tok in sent.token]
+        return display_tokens, ents
 
 
 processor_aliases = {
     "Spacy": SpacyExtractor,
-    "Stanza (OpenIE)": OpenIEExtractor
+    "Stanza": OpenIEExtractor
 }
 
 

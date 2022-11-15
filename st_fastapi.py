@@ -3,19 +3,8 @@ import pandas as pd
 import streamlit as st
 import numpy as np
 from src.extractors import get_processor_list, alias_to_class
-from src.utils import LanguageDetector, get_supported_languages
 from annotated_text import annotated_text
-
-
-@st.cache(allow_output_mutation=True)
-def load_language_detector():
-    return LanguageDetector()
-
-
-@st.cache(allow_output_mutation=True)
-def load_processor(alias, lang):
-    return alias_to_class(alias)(lang)
-
+from fast_api import get_lang, get_parsing
 
 st.set_page_config(
     page_title="Extractor", layout="wide"
@@ -26,18 +15,13 @@ with c30:
     st.title("Fact Extractor")
     st.header("")
 
-lang_detector = load_language_detector()
 file = st.file_uploader("Загрузка текстовых файлов")
 
 doc = None
 if file:
     doc = file.read().decode("utf-8")
-
-    languages = lang_detector.detect(doc)[0]
-
-    major_language = Counter(languages).most_common(1)[0][0]
-
-    if major_language not in get_supported_languages():
+    major_language, supported = get_lang(doc)
+    if not supported:
         st.warning("Language {} is not supported".format(major_language))
         st.stop()
 
@@ -56,13 +40,16 @@ with c1:
                                   options=possible_processors
                                   )
 with c2:
-    processor = load_processor(processor_type, major_language)
-    triples = processor.get_relations(doc)
+    error, processed = get_parsing(doc, processor_type)
+    if error:
+        st.warning(processed)
+        st.stop()
+    triples = processed["facts"]
+    ents = processed["ents"]
+    text_label = [tok if isinstance(tok, str) else tuple(
+        tok) for tok in processed["text_labels"]]
     fact_df = pd.DataFrame(triples, columns=["Объект", "Отношение", "Субъект"])
-
-    text_label, ents = processor.get_tokens_for_display(doc)
-    ents_df = pd.DataFrame(sorted(Counter(ents).items(), key=lambda x: -x[1]), columns=[
-        "Сущность", "Частота"])
+    ents_df = pd.DataFrame(ents, columns=["Сущность", "Частота"])
     annotated_text(*text_label)
     tab1, tab2 = st.tabs(["Сущности", "Факты"])
     with tab1:
