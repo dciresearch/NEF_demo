@@ -34,6 +34,11 @@ class ParseDoc(BaseModel):
     return_text_labels: bool = False
 
 
+@app.post("/list_processors")
+def list_processors(lang: str = "ru"):
+    return get_processor_list(lang)
+
+
 @ app.post("/detect_language")
 def get_language(input: ParseDoc):
     languages = lang_detector.detect(input.doc)[0]

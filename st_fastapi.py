@@ -54,7 +54,7 @@ with c2:
     tab1, tab2 = st.tabs(["Сущности", "Факты"])
     with tab1:
         tab1.subheader("Извлеченные Сущности:")
-        st.table(ents_df)
+        st.dataframe(ents_df, use_container_width=True)
     with tab2:
         tab2.subheader("Извлеченные факты:")
-        st.table(fact_df)
+        st.dataframe(fact_df, use_container_width=True)

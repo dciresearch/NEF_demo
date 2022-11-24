@@ -50,7 +50,12 @@ def get_subtree(el):
 
 
 def subtree_to_text(subtree):
-    return " ".join((t.text for t in subtree))
+    def normalize_text(tok):
+        if tok.ent_type:
+            return tok.text
+        else:
+            return tok.text.lower()
+    return " ".join((normalize_text(t) for t in subtree))
 
 
 def get_object(el, max_depth=6):
@@ -64,19 +69,25 @@ def get_object(el, max_depth=6):
 
 
 def get_full_ent_text(ent):
-    return subtree_to_text(get_subtree(ent.root))
+    return subtree_to_text(get_subtree(ent))
+
+
+def contains_letters(text):
+    return any(c.isalpha() for c in text)
 
 
 def get_subj_triples(ent):
     triples = []
-    relation_path = get_verb(ent.root.head)
+    relation_path = get_verb(ent.head)
     relation = relation_path[-1]
+    if not contains_letters(relation.text):
+        return triples
     for child in relation.children:
-        if (len(relation_path) > 1 and child.i == relation_path[-2].i) or child.i == ent.root.i:
+        if (len(relation_path) > 1 and child.i == relation_path[-2].i) or child.i == ent.i:
             continue
         objects = get_object(child)
         for obj in objects:
-            if not obj:
+            if not obj or not contains_letters(obj):
                 continue
             triples.append(
                 (get_full_ent_text(ent), "{}".format(get_compounds(relation)), obj))
@@ -85,7 +96,9 @@ def get_subj_triples(ent):
 
 def get_appos_triples(ent):
     triples = []
-    relation = ent.root.head
+    relation = ent.head
+    if relation.ent_type:
+        return triples
     mods = [relation]
     for ch in relation.children:
         if ch.dep_ in {"amod", "nmod"}:
@@ -95,14 +108,26 @@ def get_appos_triples(ent):
     return triples
 
 
-def extract_relations(doc):
-    triples = []
-    for ent in doc.ents:
-        if "subj" in ent.root.dep_:
-            triples.extend(get_subj_triples(ent))
-        if "appos" in ent.root.dep_:
-            triples.extend(get_appos_triples(ent))
+short_nouns = {
+    "en": {"i", "he", "it", "we"},
+    "ru": {"я", "он", "ты", "вы"}
+}
 
+
+def extract_relations(doc):
+    def valid_noun(tok):
+        return tok.text.lower() in short_nouns[tok.lang_] or len(tok.text) > 2
+    triples = []
+    nouns = list(t for t in doc if t.pos_ in {
+        'NOUN', 'PRON'} and not t.ent_type and valid_noun(t))
+    ents = (e.root for e in doc.ents)
+    for ent in chain(ents, nouns):
+        if "subj" in ent.dep_:
+            triples.append((get_subj_triples(ent), ent.i))
+        if "appos" in ent.dep_:
+            triples.append((get_appos_triples(ent), ent.i))
+    triples = list(tr for group, i in sorted(
+        triples, key=lambda x: x[1]) for tr in group)
     return triples
 
 
