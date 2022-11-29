@@ -45,11 +45,11 @@ with c2:
         st.warning(processed)
         st.stop()
     triples = processed["facts"]
-    ents = processed["ents"]
+    ents = ((e, c, s) for (e, c), s in processed["ents"])
     text_label = [tok if isinstance(tok, str) else tuple(
         tok) for tok in processed["text_labels"]]
     fact_df = pd.DataFrame(triples, columns=["Объект", "Отношение", "Субъект"])
-    ents_df = pd.DataFrame(ents, columns=["Сущность", "Частота"])
+    ents_df = pd.DataFrame(ents, columns=["Сущность", "Частота", "Источник"])
     annotated_text(*text_label)
     tab1, tab2 = st.tabs(["Сущности", "Факты"])
     with tab1:

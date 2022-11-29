@@ -1,3 +1,4 @@
+from itertools import zip_longest, chain
 import json
 import toml
 import requests
@@ -57,9 +58,14 @@ def parse_document(input: ParseDoc):
         return (-1, "Processor {} not supported for language {}".format(
             input.processor_type, major_language))
     processor = load_processor(input.processor_type, major_language)
-    triples = processor.get_relations(input.doc)
-    text_label, ents = processor.get_tokens_for_display(input.doc)
-    ents = sorted(Counter(ents).items(), key=lambda x: -x[1])
+    triples, phrase_ents = processor.get_relations(input.doc)
+    text_label, true_ents = processor.get_tokens_for_display(input.doc)
+    true_ents_set = set(true_ents)
+    true_ents = sorted(Counter(true_ents).items(), key=lambda x: -x[1])
+    phrase_ents = sorted(Counter(
+        e for e in phrase_ents if e not in true_ents_set).items(), key=lambda x: -x[1])
+    ents = list(chain(zip_longest(true_ents, [], fillvalue="NER"), zip_longest(
+        phrase_ents, [], fillvalue="NounPhrases")))
     res = {"facts": triples, "ents": ents}
     if input.return_text_labels:
         res["text_labels"] = text_label

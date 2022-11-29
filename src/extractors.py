@@ -110,16 +110,22 @@ def get_appos_triples(ent):
 
 short_nouns = {
     "en": {"i", "he", "it", "we"},
-    "ru": {"я", "он", "ты", "вы"}
+    "ru": {"я", "он", "ты", "вы", "мы"}
 }
 
 
-def extract_relations(doc):
+def get_valid_nouns(doc):
     def valid_noun(tok):
         return tok.text.lower() in short_nouns[tok.lang_] or len(tok.text) > 2
-    triples = []
     nouns = list(t for t in doc if t.pos_ in {
         'NOUN', 'PRON'} and not t.ent_type and valid_noun(t))
+    return nouns
+
+
+def extract_relations(doc):
+
+    triples = []
+    nouns = get_valid_nouns(doc)
     ents = (e.root for e in doc.ents)
     for ent in chain(ents, nouns):
         if "subj" in ent.dep_:
@@ -156,7 +162,8 @@ class SpacyExtractor:
         triples = []
         for sent in doc.sents:
             triples.extend(extract_relations(sent))
-        return set(triples)
+        valid_ents = set(tr[0] for tr in triples)
+        return set(triples), valid_ents
 
     def get_entities(self, text):
         doc = self.process_document(text)
